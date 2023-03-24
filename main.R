@@ -5,15 +5,27 @@ library(data.table)
 
 # functions ---------------------------------------------------------------
 
-get_totalTVL <- function(){
+get_totalTVL_v2 <- function(){
   
   request <- GET("https://api.llama.fi/v2/historicalChainTvl")
   
   data <- content(request)
   
   res <- data.table("date" = sapply(data,'[[',"date"),
-                    
-                    "tvl_totalDefi" = sapply(data,'[[',"tvl"))
+    "tvl_totalDefi_v2" = sapply(data,'[[',"tvl"))
+  
+  return(res)
+  
+}
+
+get_totalTVL <- function(){
+  
+  request <- GET("https://api.llama.fi/charts")
+  
+  data <- content(request)
+  
+  res <- data.table("date" = sapply(data,'[[',"date"),
+                    "tvl_totalDefi" = sapply(data,'[[',"totalLiquidityUSD"))
   
   return(res)
   
@@ -26,10 +38,11 @@ get_protocolsInfo <- function(){
   data <- content(request)
   
   res <- data.table(
-                    "name" = sapply(data,'[[',"name"),
-                    "module" = sapply(data,'[[',"module"),
-                    "tvl" = sapply(data,'[[',"tvl"),
-                    "oracles" = sapply(data,'[[',"oracles"))
+    "slug" = sapply(data,'[[',"slug"),
+    "name" = sapply(data,'[[',"name"),
+    "module" = sapply(data,'[[',"module"),
+    "tvl" = sapply(data,'[[',"tvl"),
+    "oracles" = sapply(data,'[[',"oracles"))
   
   #create ID column
   res[ , ID := .I]
@@ -44,13 +57,55 @@ get_protocolsInfo <- function(){
   
 }
 
+get_protocolTVL <- function(this_protocolSlug){
+  
+  request <- GET(paste0("https://api.llama.fi/protocol/", this_protocolSlug))
+  
+  data <- content(request)
+  
+  tvldata <- data$tvl
+  
+  res <- data.table("date" = sapply(tvldata,'[[',"date"),
+    "tvl_protocol" = sapply(tvldata,'[[',"totalLiquidityUSD"),
+    protocolSlug = this_protocolSlug)
+  
+  return(res)
+  
+}
+
+get_oracleTVL <- function(this_oracle){
+  
+  oracleSecuredProtocols <- get_protocolsInfo()[oracles == this_oracle,]
+  
+  for (i in 1:nrow(oracleSecuredProtocols)){
+    
+    print(paste0("progress: ", round(i/nrow(oracleSecuredProtocols)*100, 2), "%"))
+    
+    this_protocolSlug <- oracleSecuredProtocols$slug[i]
+    
+    if(i == 1){
+      oracle_tvl <- get_protocolTVL(this_protocolSlug)
+    }else{
+      oracle_tvl <- rbind(oracle_tvl, get_protocolTVL(this_protocolSlug))
+    }
+    
+  }
+  
+  return(oracle_tvl)
+  
+}
 
 
 # tests -------------------------------------------------------------------
+tvl_totalDefi <- get_totalTVL()
+
+tvl_totalDefi_v2 <- get_totalTVL_v2()
+
 pr <- get_protocolsInfo()
 
-# need to list the protocols secured by Chainlink (call protocols and it says which oracles they use)
-# and then get the tvl for each of these protocols
+tvl_protocol <- get_protocolTVL("aave")
+
+tvl_chainlink <- get_oracleTVL("Chainlink")
 
 
 
