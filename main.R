@@ -1,6 +1,7 @@
 rm(list = ls())
 library(httr)
 library(data.table)
+library(ggplot2)
 
 
 # functions ---------------------------------------------------------------
@@ -108,7 +109,9 @@ tvl_protocol <- get_protocolTVL("aave")
 tvl_chainlink <- get_oracleTVL("Chainlink")
 
 
-
+ggplot(tvl_chainlink, aes(x= date, y=tvl_protocol, col=protocolSlug)) +
+  geom_line() +
+  theme(legend.position="none")
 
 
 
