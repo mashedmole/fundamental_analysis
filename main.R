@@ -2,6 +2,7 @@ rm(list = ls())
 library(httr)
 library(data.table)
 library(ggplot2)
+library(anytime)
 
 
 # functions ---------------------------------------------------------------
@@ -97,23 +98,45 @@ get_oracleTVL <- function(this_oracle){
 }
 
 
-# tests -------------------------------------------------------------------
-tvl_totalDefi <- get_totalTVL()
 
-tvl_totalDefi_v2 <- get_totalTVL_v2()
-
-pr <- get_protocolsInfo()
-
-tvl_protocol <- get_protocolTVL("aave")
-
+# chainlink tvl -----------------------------------------------------------
 tvl_chainlink <- get_oracleTVL("Chainlink")
+tvl_chainlink <- tvl_chainlink[order(date), ]
+tvl_chainlink$date <- anydate(tvl_chainlink$date)
+tvl_chainlink_agg <- tvl_chainlink[, .(tvl_allprotocols = sum(tvl_protocol)), by = date]
+
+ggplot(tvl_chainlink_agg, aes(x= date, y=tvl_allprotocols)) +
+  geom_point() 
 
 
-ggplot(tvl_chainlink, aes(x= date, y=tvl_protocol, col=protocolSlug)) +
-  geom_line() +
-  theme(legend.position="none")
 
+# tests -------------------------------------------------------------------
+# tvl_totalDefi <- get_totalTVL()
+# 
+# tvl_totalDefi_v2 <- get_totalTVL_v2()
+# 
+# pr <- get_protocolsInfo()
+# 
+# tvl_protocol <- get_protocolTVL("aave")
+# 
+# tvl_chainlink <- get_oracleTVL("Chainlink")
+# 
 
+as.numeric(as.POSIXct("2019-05-08"))
+as.numeric(as.POSIXct("2023-03-25"))
+
+request <- GET("https://api.coingecko.com/api/v3/coins/ethereum/market_chart/range?vs_currency=usd&from=1557244800&to=1679673600")
+data <- content(request)
+data$total_volumes
+
+prices <- data.table("date" = sapply(data$prices,'[[',1),
+                  "price" = sapply(data$prices,'[[',2))
+
+marketcap <- data.table("date" = sapply(data$market_caps,'[[',1),
+                     "marketcap" = sapply(data$market_caps,'[[',2))
+
+volume <- data.table("date" = sapply(data$total_volumes,'[[',1),
+                     "volume" = sapply(data$total_volumes,'[[',2))
 
 
 
