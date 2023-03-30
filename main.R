@@ -180,13 +180,13 @@ data_chainlink <- data_chainlink[-nrow(data_chainlink),]
 # tvl_chainlink[date == "2023-03-29", ][order(-tvl_protocol),]
 
 
-ggplot(data_chainlink, aes(date)) + 
+start_plot <- "2020-01-01"
+data_chainlink_plot <- data_chainlink[c(which(data_chainlink$date == start_plot):nrow(data_chainlink)), ]
+
+ggplot(data_chainlink_plot, aes(date)) + 
   geom_line(aes(y = log(tvl_ChainlinkSecured_allprotocols), colour = "tvl_secured_Chainlink")) + 
   geom_line(aes(y = log(marketcap), colour = "marketcap_chainlink"))
 
-
-start_plot <- "2020-01-01"
-data_chainlink_plot <- data_chainlink[c(which(data_chainlink$date == start_plot):nrow(data_chainlink)), ]
 ggplot(data_chainlink_plot, aes(date)) + 
   geom_line(aes(y = log(marketcap)/log(tvl_ChainlinkSecured_allprotocols), colour = "var0"))
 
