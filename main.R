@@ -3,6 +3,10 @@ library(httr)
 library(data.table)
 library(ggplot2)
 library(anytime)
+library(dplyr)
+library(stringr)
+
+
 
 
 # functions ---------------------------------------------------------------
@@ -97,18 +101,68 @@ get_oracleTVL <- function(this_oracle){
   
 }
 
+get_coinMarketData <- function(this_coin, date_start, date_end, cur){
+  # this_coin <- "chainlink"
+  # date_start <- "2019-12-31"
+  # date_end <- "2020-01-01"
+  # cur <- "usd"
+  
+  request <- GET(paste0(
+    "https://api.coingecko.com/api/v3/coins/",
+    this_coin,
+    "/market_chart/range?vs_currency=",
+    cur,
+    "&from=",
+    as.numeric(as.POSIXct(date_start)),
+    "&to=", 
+    as.numeric(as.POSIXct(date_end))
+    )
+  )
 
+  data <- content(request)
+  
+  prices <- data.table("date" = sapply(data$prices,'[[',1),
+                       "price" = sapply(data$prices,'[[',2))
+  
+  marketcap <- data.table("date" = sapply(data$market_caps,'[[',1),
+                          "marketcap" = sapply(data$market_caps,'[[',2))
+  
+  volume <- data.table("date" = sapply(data$total_volumes,'[[',1),
+                       "volume" = sapply(data$total_volumes,'[[',2))
+  
+  dates <- unique(prices$date, marketcap$date, volume$date)
+  
+  res <- data.table(date = dates) %>%
+    left_join(prices, by = c('date' = 'date')) %>%
+    left_join(marketcap, by = c('date' = 'date')) %>%
+    left_join(volume, by = c('date' = 'date'))
+
+}
 
 # chainlink tvl -----------------------------------------------------------
 tvl_chainlink <- get_oracleTVL("Chainlink")
 tvl_chainlink <- tvl_chainlink[order(date), ]
 tvl_chainlink$date <- anydate(tvl_chainlink$date)
-tvl_chainlink_agg <- tvl_chainlink[, .(tvl_allprotocols = sum(tvl_protocol)), by = date]
-
-ggplot(tvl_chainlink_agg, aes(x= date, y=tvl_allprotocols)) +
-  geom_point() 
+tvl_chainlink_agg <- tvl_chainlink[, .(tvl_ChainlinkSecured_allprotocols = sum(tvl_protocol)), by = date]
 
 
+
+
+# chainlink market data ---------------------------------------------------
+date_start <- tvl_chainlink_agg$date[1]
+date_end <- tvl_chainlink_agg$date[length(tvl_chainlink_agg$date)]
+
+marketdata_chainlink <- get_coinMarketData("chainlink", date_start, date_end, "usd")
+marketdata_chainlink <- marketdata_chainlink[order(date), ]
+marketdata_chainlink$date <- anydate(round(marketdata_chainlink$date/1000))
+
+
+
+# merge datasets ----------------------------------------------------------
+data_chainlink <- marketdata_chainlink %>% left_join(tvl_chainlink_agg, by = c('date' = 'date'))
+
+# ignore today
+data_chainlink <- data_chainlink[-nrow(data_chainlink),]
 
 # tests -------------------------------------------------------------------
 # tvl_totalDefi <- get_totalTVL()
@@ -121,22 +175,33 @@ ggplot(tvl_chainlink_agg, aes(x= date, y=tvl_allprotocols)) +
 # 
 # tvl_chainlink <- get_oracleTVL("Chainlink")
 # 
+# 
+# tvl_chainlink[date == "2023-03-30", ][order(-tvl_protocol),]
+# tvl_chainlink[date == "2023-03-29", ][order(-tvl_protocol),]
 
-as.numeric(as.POSIXct("2019-05-08"))
-as.numeric(as.POSIXct("2023-03-25"))
 
-request <- GET("https://api.coingecko.com/api/v3/coins/ethereum/market_chart/range?vs_currency=usd&from=1557244800&to=1679673600")
-data <- content(request)
-data$total_volumes
+ggplot(data_chainlink, aes(date)) + 
+  geom_line(aes(y = log(tvl_ChainlinkSecured_allprotocols), colour = "tvl_secured_Chainlink")) + 
+  geom_line(aes(y = log(marketcap), colour = "marketcap_chainlink"))
 
-prices <- data.table("date" = sapply(data$prices,'[[',1),
-                  "price" = sapply(data$prices,'[[',2))
 
-marketcap <- data.table("date" = sapply(data$market_caps,'[[',1),
-                     "marketcap" = sapply(data$market_caps,'[[',2))
+start_plot <- "2020-01-01"
+data_chainlink_plot <- data_chainlink[c(which(data_chainlink$date == start_plot):nrow(data_chainlink)), ]
+ggplot(data_chainlink_plot, aes(date)) + 
+  geom_line(aes(y = log(marketcap)/log(tvl_ChainlinkSecured_allprotocols), colour = "var0"))
 
-volume <- data.table("date" = sapply(data$total_volumes,'[[',1),
-                     "volume" = sapply(data$total_volumes,'[[',2))
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
